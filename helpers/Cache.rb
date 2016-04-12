@@ -6,7 +6,7 @@ class Cache
 		@redis = Redis.new()
 	end
 
-	def cache?(key, query, size = 550)
+	def cache?(key, query, size = 1000)
 		if(data = @redis.get(key)).nil?
                         @redis.set(key, (data = DataFactory.new().retrieve(query: query, size: size).to_json))
                         @redis.expire(key,14400)
@@ -16,14 +16,16 @@ class Cache
 	end
 
 	# this method must recive an object and return the same kind
-	def historical(key, data)
+	def historical_run(key, data)
 		historical_key = "#{key}:historical"
 
 		if(historical_data = @redis.get(historical_key)).nil? # case there isn't historical data the provided data must be used as historical
 			@redis.set(historical_key, set_status(data, true).to_json)
 			return set_status(data, true)
 		else # case there is a historical data the new data must be confronted 
-			return diff(historical_data, data)
+			_data = diff(historical_data, data)
+			@redis.set(historical_key,_data.to_json)
+			return _data
 		end
 
 	end
@@ -60,19 +62,18 @@ class Cache
 	def purge_from_new_data(key, id)
 		data = JSON.parse(@redis.get(key))
 		data.delete(id)
-		data_F = historical(key, data)
+		data_F = historical_run(key, data)
                 @redis.set(key, data_F.to_json)
 	end
 
 	# this method must return an object
 	def cache_data?(key, obj)
                 if(data = @redis.get(key)).nil? # this data is a json
-			puts "--- none data found, key #{key}"
 
-			data = historical(key, obj.map()).to_json
+			data = historical_run(key, obj.map()).to_json
                         @redis.set(key, data) # redis must cache a json
                         @redis.expire(key,14400)
-                end
+		end
 
                 return JSON.parse(data) # this data must be changed to object
         end
