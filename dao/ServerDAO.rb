@@ -16,6 +16,7 @@ class ServerDAO
 		data = JSON.parse(Cache.new().cache?('data:server','@fields.tipo:"INSTANCE"'))
                 data2 = JSON.parse(Cache.new().cache?('data:jvmmemory','@fields.tipo:"JVMMEMORIA"'))
                 data3 = JSON.parse(Cache.new().cache?('data:datasource','@fields.tipo:"DATASOURCE"'))
+                data4 = JSON.parse(Cache.new().cache?('data:application','@fields.tipo:"APPLICATION"'))
 		objects = {}
 
 		data.each do |d|
@@ -33,6 +34,7 @@ class ServerDAO
 				objects[key][:id] = id
                         	objects[key][:port] = port
 				objects[key][:target] = target
+			rescue
 			end
                 end
 
@@ -50,17 +52,20 @@ class ServerDAO
 			datasource = []
 			jvmmemory = {}
 			data = []
+			application = []
 
 			begin
 				jvm = data2.select do |d|
                                 	d["_source"]["@fields"]["instance"][0] == server && d["_source"]["@fields"]["ambiente"][0] == env && d["_source"]["@fields"]["servidor"][0] == as && d["_source"]["@fields"]["host"][0] == host
                         	end
+			rescue
 			end
 
 			begin
                         	datasource = data3.select do |d|
                                 	d["_source"]["@fields"]["instance"][0] == server && d["_source"]["@fields"]["ambiente"][0] == env && d["_source"]["@fields"]["servidor"][0] == as && d["_source"]["@fields"]["host"][0] == host
                         	end
+			rescue
 			end
 
 			begin
@@ -71,25 +76,32 @@ class ServerDAO
                                         }
                                 	: jvmmemory = {}
                         	end
+			rescue
 			end
 			
-			#begin
-                        #	if datasource.length > 0 ?
-                        #        	data =  {
-                        #                	        :max_pool => datasource[0]["_source"]["@fields"]["MaxPoolSize"][0],
-                        #                	}
-                        #        	: data = {}
-                        #	end
-			#end
-
 			begin
 				datasource.uniq!
 				datasource.each do |d|
 					data << { :desc => d["_source"]["@fields"]["pool"][0], :max_pool => d["_source"]["@fields"]["MaxPoolSize"][0] }
 				end
+			rescue
 			end
 
-                        ob = Server.new(id, server, env, target, host, as, port, jvmmemory, data)
+			 begin
+                                app = data4.select do |d|
+                                        d["_source"]["@fields"]["instance"][0] == server && d["_source"]["@fields"]["ambiente"][0] == env && d["_source"]["@fields"]["servidor"][0] == as && d["_source"]["@fields"]["host"][0] == host
+                                end
+                        rescue
+                        end
+
+			begin
+                                app.each do |d|
+                                        application << d["_source"]["@fields"]["app"][0]
+                                end
+                        rescue
+                        end
+
+                        ob = Server.new(id, server, env, target, host, as, port, jvmmemory, data, application.uniq)
                         ret[id] = ob.to_s
 
                 end
